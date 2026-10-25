@@ -5,7 +5,7 @@ import time
 import math
 
 # ==========================================
-# CARD SORTING CHALLENGE (ANIMATED EDITION)
+# CARD SORTING CHALLENGE (5-ALGORITHM EDITION)
 # Python + DSA + Tkinter GUI
 # ==========================================
 
@@ -17,6 +17,7 @@ GOLD = "#F4C542"
 ORANGE = "#F39C12"
 CYAN = "#00D2FF"
 PURPLE = "#AF7AC5"
+PINK = "#FF4081"
 WHITE = "#FFFFFF"
 RED = "#E74C3C"
 MUTED = "#B8CEC5"
@@ -245,7 +246,6 @@ def insertion_sort(cards):
             }
 
             if cards[j][0] > current[0]:
-                # Swap in place so the lifted key card glides left while cards[j] slides right
                 cards[j], cards[j + 1] = cards[j + 1], cards[j]
                 movements += 1
 
@@ -284,6 +284,277 @@ def insertion_sort(cards):
     }
 
 
+def quick_sort(cards):
+    cards = cards.copy()
+    n = len(cards)
+    comparisons = 0
+    movements = 0
+    sorted_indices = set()
+
+    def _quick_sort(low, high):
+        nonlocal comparisons, movements
+
+        if low > high:
+            return
+
+        if low == high:
+            sorted_indices.add(low)
+            yield {
+                "action": "mark_sorted",
+                "index": low,
+                "cards": cards.copy(),
+                "comparisons": comparisons,
+                "movements": movements,
+                "sorted": sorted_indices.copy(),
+                "status": f"Quick Sort: {card_text(cards[low])} locked in sorted position"
+            }
+            return
+
+        pivot = cards[high]
+        yield {
+            "action": "pivot_lift",
+            "pivot_idx": high,
+            "low": low,
+            "high": high,
+            "cards": cards.copy(),
+            "comparisons": comparisons,
+            "movements": movements,
+            "sorted": sorted_indices.copy(),
+            "status": f"Quick Sort: Partitioning [{low + 1}..{high + 1}] around pivot {card_text(pivot)}"
+        }
+
+        i = low - 1
+
+        for j in range(low, high):
+            comparisons += 1
+            yield {
+                "action": "pivot_compare",
+                "scan_idx": j,
+                "pivot_idx": high,
+                "bound_idx": i if i >= low else None,
+                "cards": cards.copy(),
+                "comparisons": comparisons,
+                "movements": movements,
+                "sorted": sorted_indices.copy(),
+                "status": f"Quick Sort: Comparing {card_text(cards[j])} with pivot {card_text(pivot)}"
+            }
+
+            if cards[j][0] <= pivot[0]:
+                i += 1
+                if i != j:
+                    cards[i], cards[j] = cards[j], cards[i]
+                    movements += 1
+                    yield {
+                        "action": "pivot_swap",
+                        "indices": (i, j),
+                        "pivot_idx": high,
+                        "cards": cards.copy(),
+                        "comparisons": comparisons,
+                        "movements": movements,
+                        "sorted": sorted_indices.copy(),
+                        "status": f"Quick Sort: Moving {card_text(cards[i])} left of partition boundary"
+                    }
+
+        pivot_final = i + 1
+        sorted_indices.add(pivot_final)
+
+        if pivot_final != high:
+            cards[pivot_final], cards[high] = cards[high], cards[pivot_final]
+            movements += 1
+            yield {
+                "action": "swap",
+                "indices": (pivot_final, high),
+                "cards": cards.copy(),
+                "comparisons": comparisons,
+                "movements": movements,
+                "sorted": sorted_indices.copy(),
+                "status": f"Quick Sort: Placing pivot {card_text(cards[pivot_final])} into sorted slot {pivot_final + 1}"
+            }
+        else:
+            yield {
+                "action": "lower_min",
+                "min_idx": high,
+                "cards": cards.copy(),
+                "comparisons": comparisons,
+                "movements": movements,
+                "sorted": sorted_indices.copy(),
+                "status": f"Quick Sort: Pivot {card_text(cards[high])} is already in sorted slot {high + 1}"
+            }
+
+        yield from _quick_sort(low, pivot_final - 1)
+        yield from _quick_sort(pivot_final + 1, high)
+
+    yield from _quick_sort(0, n - 1)
+
+    yield {
+        "action": "done",
+        "cards": cards.copy(),
+        "comparisons": comparisons,
+        "movements": movements,
+        "sorted": set(range(n)),
+        "status": "Quick Sort complete!"
+    }
+
+
+def merge_sort(cards):
+    cards = cards.copy()
+    n = len(cards)
+    comparisons = 0
+    movements = 0
+    sorted_indices = set()
+
+    def _merge_sort(left, right):
+        nonlocal comparisons, movements
+
+        if left >= right:
+            return
+
+        mid = (left + right) // 2
+        yield from _merge_sort(left, mid)
+        yield from _merge_sort(mid + 1, right)
+
+        # Lift both sorted halves into the upper staging lane
+        yield {
+            "action": "merge_lift",
+            "left": left,
+            "mid": mid,
+            "right": right,
+            "cards": cards.copy(),
+            "comparisons": comparisons,
+            "movements": movements,
+            "sorted": sorted_indices.copy(),
+            "status": f"Merge Sort: Merging subarrays [{left + 1}..{mid + 1}] and [{mid + 2}..{right + 1}]"
+        }
+
+        l_idx = left
+        r_idx = mid + 1
+        k = left
+        merged_cards = []
+        merged_order = []
+        dropped = set()
+
+        while l_idx <= mid and r_idx <= right:
+            comparisons += 1
+            yield {
+                "action": "merge_compare",
+                "l_idx": l_idx,
+                "r_idx": r_idx,
+                "left": left,
+                "mid": mid,
+                "right": right,
+                "dropped": dropped.copy(),
+                "cards": cards.copy(),
+                "comparisons": comparisons,
+                "movements": movements,
+                "sorted": sorted_indices.copy(),
+                "status": f"Merge Sort: Comparing {card_text(cards[l_idx])} (Left) vs {card_text(cards[r_idx])} (Right)"
+            }
+
+            if cards[l_idx][0] <= cards[r_idx][0]:
+                winner = l_idx
+                l_idx += 1
+            else:
+                winner = r_idx
+                r_idx += 1
+
+            movements += 1
+            merged_cards.append(cards[winner])
+            merged_order.append(winner)
+            dropped.add(winner)
+
+            yield {
+                "action": "merge_drop",
+                "from_idx": winner,
+                "to_slot": k,
+                "left": left,
+                "mid": mid,
+                "right": right,
+                "dropped": dropped.copy(),
+                "cards": cards.copy(),
+                "comparisons": comparisons,
+                "movements": movements,
+                "sorted": sorted_indices.copy(),
+                "status": f"Merge Sort: Placing {card_text(cards[winner])} into merged slot {k + 1}"
+            }
+            k += 1
+
+        while l_idx <= mid:
+            winner = l_idx
+            l_idx += 1
+            movements += 1
+            merged_cards.append(cards[winner])
+            merged_order.append(winner)
+            dropped.add(winner)
+
+            yield {
+                "action": "merge_drop",
+                "from_idx": winner,
+                "to_slot": k,
+                "left": left,
+                "mid": mid,
+                "right": right,
+                "dropped": dropped.copy(),
+                "cards": cards.copy(),
+                "comparisons": comparisons,
+                "movements": movements,
+                "sorted": sorted_indices.copy(),
+                "status": f"Merge Sort: Placing remaining left card {card_text(cards[winner])} into slot {k + 1}"
+            }
+            k += 1
+
+        while r_idx <= right:
+            winner = r_idx
+            r_idx += 1
+            movements += 1
+            merged_cards.append(cards[winner])
+            merged_order.append(winner)
+            dropped.add(winner)
+
+            yield {
+                "action": "merge_drop",
+                "from_idx": winner,
+                "to_slot": k,
+                "left": left,
+                "mid": mid,
+                "right": right,
+                "dropped": dropped.copy(),
+                "cards": cards.copy(),
+                "comparisons": comparisons,
+                "movements": movements,
+                "sorted": sorted_indices.copy(),
+                "status": f"Merge Sort: Placing remaining right card {card_text(cards[winner])} into slot {k + 1}"
+            }
+            k += 1
+
+        cards[left:right + 1] = merged_cards
+        if left == 0 and right == n - 1:
+            for idx in range(n):
+                sorted_indices.add(idx)
+
+        yield {
+            "action": "merge_commit",
+            "left": left,
+            "right": right,
+            "order": merged_order,
+            "cards": cards.copy(),
+            "comparisons": comparisons,
+            "movements": movements,
+            "sorted": sorted_indices.copy(),
+            "status": f"Merge Sort: Subarray [{left + 1}..{right + 1}] merged!"
+        }
+
+    yield from _merge_sort(0, n - 1)
+
+    yield {
+        "action": "done",
+        "cards": cards.copy(),
+        "comparisons": comparisons,
+        "movements": movements,
+        "sorted": set(range(n)),
+        "status": "Merge Sort complete!"
+    }
+
+
 # ==========================================
 # MAIN APPLICATION
 # ==========================================
@@ -293,8 +564,8 @@ class CardSortingGame:
     def __init__(self, root):
         self.root = root
         self.root.title("Card Sorting Challenge | Python + DSA")
-        self.root.geometry("1080x810")
-        self.root.minsize(920, 700)
+        self.root.geometry("1120x830")
+        self.root.minsize(960, 720)
         self.root.configure(bg=BG)
 
         self.cards = []
@@ -310,7 +581,7 @@ class CardSortingGame:
         self.comparisons = 0
         self.movements = 0
         self.start_time = 0
-        self.speed_multiplier = 1.0
+        self.speed_multiplier = 1.25
 
         self.build_ui()
         self.root.after(100, lambda: self.new_game(animate=True))
@@ -362,11 +633,11 @@ class CardSortingGame:
         )
         self.status_label.pack(side="right")
 
-        # Card canvas area
+        # Card canvas area (extra height for 2-lane Merge Sort & Quick Sort pivots)
         self.canvas = tk.Canvas(
             self.root,
             bg="#145A32",
-            height=275,
+            height=295,
             highlightthickness=2,
             highlightbackground=GOLD
         )
@@ -377,22 +648,23 @@ class CardSortingGame:
         legend_frame.pack(pady=(0, 6))
 
         legend_items = [
-            (GOLD, "Comparing"),
+            (GOLD, "Comparing / Scan"),
             (RED, "Swapping / Shifting"),
-            (CYAN, "Minimum (Selection)"),
-            (PURPLE, "Active Key (Insertion)"),
+            (CYAN, "Min / Left Half"),
+            (PURPLE, "Key / Right Half"),
+            (PINK, "Quick Sort Pivot"),
             (BRIGHT_GREEN, "Sorted")
         ]
         for color, label in legend_items:
-            swatch = tk.Frame(legend_frame, bg=color, width=14, height=14)
-            swatch.pack(side="left", padx=(12, 4))
+            swatch = tk.Frame(legend_frame, bg=color, width=13, height=13)
+            swatch.pack(side="left", padx=(10, 4))
             tk.Label(
                 legend_frame,
                 text=label,
                 font=("Arial", 9, "bold"),
                 bg=BG,
                 fg=MUTED
-            ).pack(side="left", padx=(0, 8))
+            ).pack(side="left", padx=(0, 6))
 
         # Drag, drop, and resize bindings
         self.canvas.bind("<ButtonPress-1>", self.start_drag)
@@ -402,7 +674,7 @@ class CardSortingGame:
 
         # Main game buttons
         button_frame = tk.Frame(self.root, bg=BG)
-        button_frame.pack(pady=6)
+        button_frame.pack(pady=5)
 
         self.make_button(
             button_frame, "🎲 New Cards",
@@ -429,29 +701,41 @@ class CardSortingGame:
             font=("Arial", 12, "bold"),
             bg=BG,
             fg=GOLD
-        ).grid(row=0, column=0, columnspan=4, pady=6)
+        ).grid(row=0, column=0, columnspan=6, pady=6)
 
         self.make_button(
             algo_frame, "Bubble Sort",
             lambda: self.start_sort("Bubble Sort"),
             "#C0392B"
-        ).grid(row=1, column=0, padx=6)
+        ).grid(row=1, column=0, padx=5)
 
         self.make_button(
             algo_frame, "Selection Sort",
             lambda: self.start_sort("Selection Sort"),
             "#B9770E"
-        ).grid(row=1, column=1, padx=6)
+        ).grid(row=1, column=1, padx=5)
 
         self.make_button(
             algo_frame, "Insertion Sort",
             lambda: self.start_sort("Insertion Sort"),
             "#148F77"
-        ).grid(row=1, column=2, padx=6)
+        ).grid(row=1, column=2, padx=5)
+
+        self.make_button(
+            algo_frame, "Quick Sort",
+            lambda: self.start_sort("Quick Sort"),
+            "#AD1457"
+        ).grid(row=1, column=3, padx=5)
+
+        self.make_button(
+            algo_frame, "Merge Sort",
+            lambda: self.start_sort("Merge Sort"),
+            "#5B2C6F"
+        ).grid(row=1, column=4, padx=5)
 
         # Animation speed slider
         speed_box = tk.Frame(algo_frame, bg=PANEL, padx=10, pady=2)
-        speed_box.grid(row=1, column=3, padx=10)
+        speed_box.grid(row=1, column=5, padx=8)
 
         tk.Label(
             speed_box,
@@ -467,7 +751,7 @@ class CardSortingGame:
             to=3.0,
             resolution=0.25,
             orient="horizontal",
-            length=110,
+            length=105,
             bg=PANEL,
             fg=WHITE,
             highlightthickness=0,
@@ -518,7 +802,7 @@ class CardSortingGame:
         footer.pack(pady=6)
 
         self.make_button(
-            footer, "📊 Compare Algorithms",
+            footer, "📊 Compare All 5 Algorithms",
             self.compare_algorithms, "#34495E"
         ).pack(side="left", padx=8)
 
@@ -529,7 +813,7 @@ class CardSortingGame:
 
         tk.Label(
             self.root,
-            text="DSA Concepts: Bubble Sort • Selection Sort • Insertion Sort",
+            text="DSA Concepts: Bubble Sort • Selection Sort • Insertion Sort • Quick Sort • Merge Sort",
             font=("Arial", 9),
             bg=BG,
             fg=MUTED
@@ -563,8 +847,8 @@ class CardSortingGame:
     # ======================================
 
     def compute_layout(self):
-        width = max(self.canvas.winfo_width(), 900)
-        height = max(self.canvas.winfo_height(), 275)
+        width = max(self.canvas.winfo_width(), 920)
+        height = max(self.canvas.winfo_height(), 295)
         count = max(1, len(self.cards))
 
         card_width = min(
@@ -574,9 +858,9 @@ class CardSortingGame:
         card_height = int(card_width * CARD_HEIGHT / CARD_WIDTH)
         gap = (width - count * card_width) // (count + 1)
 
-        # Leave vertical headroom for lifted key cards & swap arcs
-        base_y = (height - card_height) // 2 + 16
-        base_y = max(55, base_y)
+        # Extra top headroom for lifted Merge Sort subarrays and Quick Sort pivots
+        base_y = (height - card_height) // 2 + 26
+        base_y = max(76, base_y)
 
         slots = []
         for i in range(count):
@@ -601,7 +885,7 @@ class CardSortingGame:
 
             outline = BRIGHT_GREEN if is_sorted else "#D5D8DC"
             outline_width = 3 if is_sorted else 2
-            fill_color = "#F4ECF7" if False else ("#EAFAF1" if is_sorted else "#FDFEFE")
+            fill_color = "#EAFAF1" if is_sorted else "#FDFEFE"
 
             # Drop shadow
             shadow = self.canvas.create_rectangle(
@@ -650,7 +934,7 @@ class CardSortingGame:
                 fill=color
             )
 
-            # Floating status badge above card (e.g., MIN, KEY, ✓)
+            # Floating status badge above card
             badge_text = self.canvas.create_text(
                 x + card_width // 2,
                 y - 11,
@@ -705,6 +989,19 @@ class CardSortingGame:
             else:
                 self.style_card(idx, outline="#D5D8DC", width=2, fill="#FDFEFE", badge="")
 
+    def build_merge_badges(self, left, mid, right, dropped, extra=None):
+        badges = {}
+        for idx in range(left, right + 1):
+            if idx in dropped:
+                badges[idx] = (BRIGHT_GREEN, "#EAFAF1", "MERGED")
+            elif idx <= mid:
+                badges[idx] = (CYAN, "#EBF5FB", "LEFT")
+            else:
+                badges[idx] = (PURPLE, "#F5EEF8", "RIGHT")
+        if extra:
+            badges.update(extra)
+        return badges
+
     def animate_trajectories(self, trajectories, frames, on_complete):
         """
         Smoothly interpolates multiple cards simultaneously.
@@ -717,7 +1014,6 @@ class CardSortingGame:
                 return
 
             t = frame_idx / total_frames
-            # Smoothstep easing (3t^2 - 2t^3)
             ease = t * t * (3 - 2 * t)
 
             for idx, sx, sy, ex, ey, arc in trajectories:
@@ -762,7 +1058,6 @@ class CardSortingGame:
             text="🎲 Dealing new cards..." if new_deck else "🔀 Riffle shuffling cards..."
         )
 
-        # Phase 1: Gather all cards into a center stack
         gather_traj = []
         for idx in range(len(self.cards)):
             sx, sy, _, _ = self.card_positions[idx]
@@ -774,7 +1069,6 @@ class CardSortingGame:
                 finish_deal()
                 return
 
-            # Split deck left & right
             split_traj = []
             for idx in range(len(self.cards)):
                 sx, sy, _, _ = self.card_positions[idx]
@@ -784,7 +1078,6 @@ class CardSortingGame:
                 split_traj.append((idx, sx, sy, tx, base_y, 12 * direction))
 
             def merge_riffle():
-                # Interleave z-order and snap back to center
                 order = list(range(len(self.cards)))
                 random.shuffle(order)
                 for idx in order:
@@ -803,7 +1096,6 @@ class CardSortingGame:
             self.animate_trajectories(split_traj, 8, merge_riffle)
 
         def finish_deal():
-            # Apply the actual new/shuffled card values and stack them in center
             if new_deck:
                 self.cards = random.sample(create_deck(), 8)
             else:
@@ -813,7 +1105,6 @@ class CardSortingGame:
             for idx in range(len(self.cards)):
                 self.move_card_to(idx, center_x, base_y)
 
-            # Fan cards out to their respective slots with an upward arc
             deal_traj = []
             for idx in range(len(self.cards)):
                 tx, ty, _, _ = slots[idx]
@@ -846,7 +1137,6 @@ class CardSortingGame:
             x, y, _, _ = slots[idx]
             self.style_card(idx, outline=GOLD, width=4, fill="#EAFAF1", badge="★", badge_color=GOLD)
 
-            # Quick hop up and down
             self.animate_trajectories(
                 [(idx, x, y, x, y, 28)],
                 6,
@@ -958,7 +1248,6 @@ class CardSortingGame:
             self.busy = True
             self.sorted_indices.clear()
 
-            # Animate the dropped card and target card swapping into their slots
             sx1, sy1, _, _ = self.card_positions[source]
             sx2, sy2, _, _ = self.card_positions[target]
             tx1, ty1, _, _ = slots[target]
@@ -983,7 +1272,6 @@ class CardSortingGame:
                 finish_manual_swap
             )
         else:
-            # Snap back to original slot
             self.busy = True
             sx, sy, _, _ = self.card_positions[source]
             tx, ty, _, _ = slots[source]
@@ -1012,12 +1300,14 @@ class CardSortingGame:
         self.update_stats()
         self.start_time = time.perf_counter()
 
-        if name == "Bubble Sort":
-            self.sort_generator = bubble_sort(self.cards)
-        elif name == "Selection Sort":
-            self.sort_generator = selection_sort(self.cards)
-        else:
-            self.sort_generator = insertion_sort(self.cards)
+        algo_map = {
+            "Bubble Sort": bubble_sort,
+            "Selection Sort": selection_sort,
+            "Insertion Sort": insertion_sort,
+            "Quick Sort": quick_sort,
+            "Merge Sort": merge_sort
+        }
+        self.sort_generator = algo_map[name](self.cards)
 
         self.status_label.config(text=f"Visualizing {name}...")
         self.animate_sort_step()
@@ -1060,7 +1350,6 @@ class CardSortingGame:
             x1, y1, _, _ = slots[i]
             x2, y2, _, _ = slots[j]
 
-            # Subtle upward pulse during comparison
             self.animate_trajectories(
                 [
                     (i, x1, y1, x1, y1, 14),
@@ -1071,7 +1360,7 @@ class CardSortingGame:
             )
 
         # ----------------------------------
-        # 2. SWAP (BUBBLE & SELECTION SORT)
+        # 2. SWAP (BUBBLE, SELECTION & QUICK)
         # ----------------------------------
         elif action == "swap":
             i, j = step["indices"]
@@ -1098,7 +1387,6 @@ class CardSortingGame:
                 self.refresh_sorted_styles(self.sorted_indices)
                 self.animate_sort_step()
 
-            # Orbit past each other using opposing upper/lower arcs
             self.animate_trajectories(
                 [
                     (i, sx1, sy1, tx1, ty1, 34),
@@ -1154,10 +1442,15 @@ class CardSortingGame:
             min_idx = step["min_idx"]
             mx, my, _, _ = self.card_positions[min_idx]
             tx, ty, _, _ = slots[min_idx]
+
+            def after_lower():
+                self.refresh_sorted_styles(self.sorted_indices)
+                self.animate_sort_step()
+
             self.animate_trajectories(
                 [(min_idx, mx, my, tx, ty, 0)],
                 8,
-                self.animate_sort_step
+                after_lower
             )
 
         # ----------------------------------
@@ -1173,7 +1466,7 @@ class CardSortingGame:
             kx, ky, _, _ = self.card_positions[key_idx]
             tx, ty, _, _ = slots[key_idx]
             self.animate_trajectories(
-                [(key_idx, kx, ky, tx, ty - 44, 0)],
+                [(key_idx, kx, ky, tx, ty - 48, 0)],
                 10,
                 self.animate_sort_step
             )
@@ -1197,7 +1490,7 @@ class CardSortingGame:
 
         elif action == "shift_right":
             from_idx = step["from_idx"]
-            to_idx = step["to_idx"]  # Currently holds the lifted KEY card
+            to_idx = step["to_idx"]
             self.raise_card_z(to_idx)
 
             self.refresh_sorted_styles(
@@ -1208,7 +1501,6 @@ class CardSortingGame:
                 }
             )
 
-            # Card at from_idx slides right on the table; lifted KEY at to_idx glides left in the air
             fx, fy, _, _ = self.card_positions[from_idx]
             kx, ky, _, _ = self.card_positions[to_idx]
             target_right_x, target_right_y, _, _ = slots[to_idx]
@@ -1248,7 +1540,173 @@ class CardSortingGame:
             )
 
         # ----------------------------------
-        # 5. SORT COMPLETED
+        # 5. QUICK SORT PIVOT & PARTITION
+        # ----------------------------------
+        elif action == "mark_sorted":
+            idx = step["index"]
+            self.refresh_sorted_styles(self.sorted_indices)
+            sx, sy, _, _ = slots[idx]
+            self.animate_trajectories(
+                [(idx, sx, sy, sx, sy, 14)],
+                6,
+                self.animate_sort_step
+            )
+
+        elif action == "pivot_lift":
+            pivot_idx = step["pivot_idx"]
+            self.raise_card_z(pivot_idx)
+            self.refresh_sorted_styles(
+                self.sorted_indices,
+                {pivot_idx: (PINK, "#FDEDEC", "PIVOT")}
+            )
+            px, py, _, _ = self.card_positions[pivot_idx]
+            tx, ty, _, _ = slots[pivot_idx]
+            self.animate_trajectories(
+                [(pivot_idx, px, py, tx, ty - 28, 0)],
+                10,
+                self.animate_sort_step
+            )
+
+        elif action == "pivot_compare":
+            scan_idx = step["scan_idx"]
+            pivot_idx = step["pivot_idx"]
+            bound_idx = step["bound_idx"]
+
+            badges = {
+                pivot_idx: (PINK, "#FDEDEC", "PIVOT"),
+                scan_idx: (GOLD, "#FEF9E7", "SCAN")
+            }
+            if bound_idx is not None and bound_idx != scan_idx:
+                badges[bound_idx] = (ORANGE, "#FEF5E7", "BOUND")
+
+            self.refresh_sorted_styles(self.sorted_indices, badges)
+            sx, sy, _, _ = slots[scan_idx]
+            self.animate_trajectories(
+                [(scan_idx, sx, sy, sx, sy, 14)],
+                8,
+                self.animate_sort_step
+            )
+
+        elif action == "pivot_swap":
+            i, j = step["indices"]
+            pivot_idx = step["pivot_idx"]
+            self.raise_card_z(i)
+            self.raise_card_z(j)
+
+            self.refresh_sorted_styles(
+                self.sorted_indices,
+                {
+                    pivot_idx: (PINK, "#FDEDEC", "PIVOT"),
+                    i: (RED, "#FDEDEC", "SWAP"),
+                    j: (RED, "#FDEDEC", "SWAP")
+                }
+            )
+
+            sx1, sy1, _, _ = self.card_positions[i]
+            sx2, sy2, _, _ = self.card_positions[j]
+            tx1, ty1, _, _ = slots[j]
+            tx2, ty2, _, _ = slots[i]
+
+            def complete_pivot_swap():
+                self.card_items[i], self.card_items[j] = self.card_items[j], self.card_items[i]
+                self.card_positions[i], self.card_positions[j] = (
+                    self.card_positions[j], self.card_positions[i]
+                )
+                self.animate_sort_step()
+
+            self.animate_trajectories(
+                [
+                    (i, sx1, sy1, tx1, ty1, 32),
+                    (j, sx2, sy2, tx2, ty2, -32)
+                ],
+                14,
+                complete_pivot_swap
+            )
+
+        # ----------------------------------
+        # 6. MERGE SORT 2-LANE BUFFER MERGE
+        # ----------------------------------
+        elif action == "merge_lift":
+            left = step["left"]
+            mid = step["mid"]
+            right = step["right"]
+
+            badges = self.build_merge_badges(left, mid, right, set())
+            self.refresh_sorted_styles(self.sorted_indices, badges)
+
+            traj = []
+            for idx in range(left, right + 1):
+                self.raise_card_z(idx)
+                sx, sy, _, _ = self.card_positions[idx]
+                tx, ty, _, _ = slots[idx]
+                traj.append((idx, sx, sy, tx, ty - 56, 0))
+
+            self.animate_trajectories(traj, 12, self.animate_sort_step)
+
+        elif action == "merge_compare":
+            l_idx = step["l_idx"]
+            r_idx = step["r_idx"]
+            left = step["left"]
+            mid = step["mid"]
+            right = step["right"]
+            dropped = step["dropped"]
+
+            badges = self.build_merge_badges(
+                left, mid, right, dropped,
+                {
+                    l_idx: (GOLD, "#FEF9E7", "CMP"),
+                    r_idx: (GOLD, "#FEF9E7", "CMP")
+                }
+            )
+            self.refresh_sorted_styles(self.sorted_indices, badges)
+
+            lx, ly, _, _ = self.card_positions[l_idx]
+            rx, ry, _, _ = self.card_positions[r_idx]
+            self.animate_trajectories(
+                [
+                    (l_idx, lx, ly, lx, ly, 10),
+                    (r_idx, rx, ry, rx, ry, 10)
+                ],
+                8,
+                self.animate_sort_step
+            )
+
+        elif action == "merge_drop":
+            from_idx = step["from_idx"]
+            to_slot = step["to_slot"]
+            left = step["left"]
+            mid = step["mid"]
+            right = step["right"]
+            dropped = step["dropped"]
+
+            self.raise_card_z(from_idx)
+            badges = self.build_merge_badges(
+                left, mid, right, dropped,
+                {from_idx: (BRIGHT_GREEN, "#EAFAF1", "MERGE ↓")}
+            )
+            self.refresh_sorted_styles(self.sorted_indices, badges)
+
+            sx, sy, _, _ = self.card_positions[from_idx]
+            tx, ty, _, _ = slots[to_slot]
+            self.animate_trajectories(
+                [(from_idx, sx, sy, tx, ty, 10)],
+                12,
+                self.animate_sort_step
+            )
+
+        elif action == "merge_commit":
+            left = step["left"]
+            right = step["right"]
+            order = step["order"]
+
+            # Rebind canvas items & positions to their newly merged slot order
+            self.card_items[left:right + 1] = [self.card_items[i] for i in order]
+            self.card_positions[left:right + 1] = [self.card_positions[i] for i in order]
+            self.refresh_sorted_styles(self.sorted_indices)
+            self.root.after(20, self.animate_sort_step)
+
+        # ----------------------------------
+        # 7. SORT COMPLETED
         # ----------------------------------
         elif action == "done":
             self.refresh_sorted_styles(self.sorted_indices)
@@ -1287,12 +1745,14 @@ class CardSortingGame:
         if self.busy:
             return
 
-        test_cards = random.sample(create_deck(), 10)
+        test_cards = random.sample(create_deck(), 12)
 
         algorithms = [
             ("Bubble Sort", bubble_sort),
             ("Selection Sort", selection_sort),
-            ("Insertion Sort", insertion_sort)
+            ("Insertion Sort", insertion_sort),
+            ("Quick Sort", quick_sort),
+            ("Merge Sort", merge_sort)
         ]
 
         results = []
@@ -1318,27 +1778,27 @@ class CardSortingGame:
 
         window = tk.Toplevel(self.root)
         window.title("Algorithm Performance")
-        window.geometry("700x390")
+        window.geometry("740x480")
         window.configure(bg=BG)
 
         tk.Label(
             window,
-            text="📊 ALGORITHM PERFORMANCE",
+            text="📊 ALGORITHM PERFORMANCE COMPARISON",
             font=("Arial", 17, "bold"),
             bg=BG,
             fg=GOLD
-        ).pack(pady=18)
+        ).pack(pady=16)
 
         tk.Label(
             window,
-            text="Test data: 10 randomly selected playing cards",
+            text="Test data: 12 randomly selected playing cards (identical starting order)",
             font=("Arial", 10),
             bg=BG,
             fg=MUTED
         ).pack(pady=4)
 
         table = tk.Frame(window, bg=PANEL)
-        table.pack(fill="x", padx=20, pady=15)
+        table.pack(fill="x", padx=25, pady=15)
 
         headers = ["Algorithm", "Comparisons", "Movements", "Time (seconds)"]
 
@@ -1366,14 +1826,14 @@ class CardSortingGame:
                     bg=PANEL,
                     fg=WHITE,
                     padx=7,
-                    pady=10
+                    pady=9
                 ).grid(row=row, column=col)
 
         tk.Label(
             window,
             text=(
-                "All three algorithms sort cards by rank.\n"
-                "Execution time may vary between runs."
+                "Divide-and-Conquer algorithms (Quick Sort & Merge Sort) scale in O(n log n) time,\n"
+                "while Bubble, Selection, and Insertion Sort scale in O(n²) average/worst-case time."
             ),
             font=("Arial", 10),
             bg=BG,
